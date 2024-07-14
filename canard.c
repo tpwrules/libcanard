@@ -994,6 +994,38 @@ void canardEncodeScalar(void* destination,
     copyBitArray(&storage.bytes[0], 0, bit_length, (uint8_t*) destination, bit_offset);
 }
 
+uint32_t canardTableEncode(const CanardCodeTable* table,
+    uint8_t* buffer,
+    void* msg,
+    bool tao)
+{
+    memset(buffer, 0, table->max_size);
+
+    uint32_t bit_ofs = 0;
+    const CanardCodeTableEntry* entry = &table->entry[0];
+    while (entry->offset < 255) {
+        uint8_t type = entry->type_size & CANARD_TABLE_CODING_TYPE_MASK;
+        uint8_t size = (entry->type_size & CANARD_TABLE_CODING_SIZE_MASK) + 1;
+        void* p = (void*)((char*)msg + entry->offset);
+
+        if (type == CANARD_TABLE_CODING_UNSIGNED || type == CANARD_TABLE_CODING_SIGNED) {
+            if (type == CANARD_TABLE_CODING_SIGNED && size == 1) { // special case as there's no signed 1 bit type
+                uint16_t float16_val = canardConvertNativeFloatToFloat16(*(float*)p);
+                canardEncodeScalar(buffer, bit_ofs, 16, &float16_val);
+            } else {
+                canardEncodeScalar(buffer, bit_ofs, size, p);
+            }
+            bit_ofs += size;
+        } else {
+            // void encoding is taken care of by memset
+            bit_ofs += size;
+        }
+
+        entry++;
+    }
+    return ((bit_ofs+7)/8);
+}
+
 void canardReleaseRxTransferPayload(CanardInstance* ins, CanardRxTransfer* transfer)
 {
     while (transfer->payload_middle != NULL)

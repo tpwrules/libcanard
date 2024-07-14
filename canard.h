@@ -712,12 +712,12 @@ typedef struct {
     CanardCodeTableEntry entry[];
 } CanardCodeTable;
 
-uint32_t canardEncodeTable(const CanardCodeTable* table,
+bool canardTableDecode(const CanardCodeTable* table,
     uint8_t* buffer,
     void* msg,
     bool tao);
 
-bool canardDecodeTable(const CanardCodeTable* table,
+uint32_t canardTableEncode(const CanardCodeTable* table,
     uint8_t* buffer,
     void* msg,
     bool tao);
