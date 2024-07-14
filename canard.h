@@ -66,6 +66,10 @@ extern "C" {
 #endif
 #endif
 
+#ifndef CANARD_ENABLE_TABLE_CODING
+#define CANARD_ENABLE_TABLE_CODING                  1
+#endif
+
 /// By default this macro resolves to the standard assert(). The user can redefine this if necessary.
 #ifndef CANARD_ASSERT
 #ifdef CANARD_ENABLE_ASSERTS
@@ -681,6 +685,44 @@ void canardEncodeScalar(void* destination,      ///< Destination buffer where th
                         uint32_t bit_offset,    ///< Offset, in bits, from the beginning of the destination buffer
                         uint8_t bit_length,     ///< Length of the value, in bits; see the table
                         const void* value);     ///< Pointer to the value; see the table
+
+#if CANARD_ENABLE_TABLE_CODING
+
+typedef struct {
+    // low 6 bits: size in bits - 1
+    // high 2 bits: data type
+    //   0: unsigned
+    //   1: signed (if size is 1 bit, then really float16)
+    //   2: void
+    //   3: complex (TBD)
+    uint8_t type_size;
+    uint8_t offset; // offset in output struct
+} CanardCodeTableEntry;
+
+#define CANARD_TABLE_CODING_UNSIGNED (0 << 6)
+#define CANARD_TABLE_CODING_SIGNED (1 << 6)
+#define CANARD_TABLE_CODING_VOID (2 << 6)
+#define CANARD_TABLE_CODING_COMPLEX (3 << 6)
+#define CANARD_TABLE_CODING_TYPE_MASK (3 << 6)
+#define CANARD_TABLE_CODING_SIZE_MASK (63)
+
+
+typedef struct {
+    uint32_t max_size;
+    CanardCodeTableEntry entry[];
+} CanardCodeTable;
+
+uint32_t canardEncodeTable(const CanardCodeTable* table,
+    uint8_t* buffer,
+    void* msg,
+    bool tao);
+
+bool canardDecodeTable(const CanardCodeTable* table,
+    uint8_t* buffer,
+    void* msg,
+    bool tao);
+
+#endif
 
 /**
  * This function can be invoked by the application to release pool blocks that are used
