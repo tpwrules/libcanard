@@ -1027,11 +1027,50 @@ static void _canardTableEncode_core(const CanardCodeTableEntry* entry,
             const CanardCodeTableEntry* aux = ++entry;
             const CanardCodeTableEntry* array_entry = ++entry;
             const CanardCodeTableEntry* array_entry_end = array_entry + bitlen;
-            for (int i=0; i<aux->bitlen+1; i++) {
+
+            int len = aux->bitlen+1;
+            for (int i=0; i<len; i++) {
                 _canardTableEncode_core(array_entry, array_entry_end, buffer, bit_ofs, p, tao);
                 p = (void*)((char*)p + aux->offset);
             }
             entry = array_entry_end-1;
+
+            break;
+        }
+
+        case CANARD_TABLE_CODING_ARRAY_DYNAMIC:
+        case CANARD_TABLE_CODING_ARRAY_DYNAMIC_TAO: {
+            const CanardCodeTableEntry* aux = ++entry;
+            const CanardCodeTableEntry* aux2 = ++entry;
+            const CanardCodeTableEntry* array_entry = ++entry;
+            const CanardCodeTableEntry* array_entry_end = array_entry + bitlen;
+
+            uint16_t max_len = (aux->bitlen | ((uint16_t)aux2->bitlen << 8))+1;
+            uint8_t len_bitlen = aux2->type_extra;
+            void* len_p = (void*)((char*)msg + aux2->offset);
+            if (type != CANARD_TABLE_CODING_ARRAY_DYNAMIC_TAO || !tao) {
+                // wrong value encoded if overrange, but it's the same in dsdlc
+                canardEncodeScalar(buffer, *bit_ofs, len_bitlen, len_p);
+                *bit_ofs += len_bitlen;
+            }
+
+            uint16_t len;
+            if (len_bitlen <= 8) {
+                len = *(uint8_t*)len_p;
+            } else { // 16 bits is max supported len
+                len = *(uint16_t*)len_p;
+            }
+            if (len > max_len) {
+                len = max_len;
+            }
+
+            for (uint16_t i=0; i<len; i++) {
+                _canardTableEncode_core(array_entry, array_entry_end, buffer, bit_ofs, p, tao);
+                p = (void*)((char*)p + aux->offset);
+            }
+            entry = array_entry_end-1;
+
+            break;
         }
 
         default:

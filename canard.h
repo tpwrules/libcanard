@@ -703,7 +703,17 @@ typedef struct {
     //      aux offset: sizeof entry
     //      aux bitlen: length - 1
 
-    //   5-7: reserved
+    //   5: dynamically sized array
+    //   6: dynamically sized array (eligible for TAO)
+    //      offset: offset to first element of array
+    //      bitlen: number of entries containing array contents
+    //      aux offset: sizeof entry
+    //      aux bitlen: length - 1
+    //      aux2 offset: offset to array len
+    //      aux2 type_extra: bitlen of len
+    //      aux2 bitlen: high 8 bits of (length - 1)
+
+    //   7: reserved
     uint8_t type_extra;
     uint8_t bitlen; // length in bits of type
 } CanardCodeTableEntry;
@@ -713,6 +723,8 @@ typedef struct {
 #define CANARD_TABLE_CODING_FLOAT (2)
 #define CANARD_TABLE_CODING_VOID (3)
 #define CANARD_TABLE_CODING_ARRAY_STATIC (4)
+#define CANARD_TABLE_CODING_ARRAY_DYNAMIC (5)
+#define CANARD_TABLE_CODING_ARRAY_DYNAMIC_TAO (6)
 #define CANARD_TABLE_CODING_TYPE_BITS (3)
 #define CANARD_TABLE_CODING_EXTRA_BITS (5)
 
