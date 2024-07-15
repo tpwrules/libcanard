@@ -735,9 +735,8 @@ typedef struct {
 } CanardCodeTable;
 
 bool canardTableDecode(const CanardCodeTable* table,
-    uint8_t* buffer,
-    void* msg,
-    bool tao);
+    const CanardRxTransfer* transfer,
+    void* msg);
 
 uint32_t canardTableEncode(const CanardCodeTable* table,
     uint8_t* buffer,

@@ -996,6 +996,146 @@ void canardEncodeScalar(void* destination,
 
 #if CANARD_ENABLE_TABLE_CODING
 
+static bool _canardTableDecode_core(const CanardCodeTableEntry* entry,
+    const CanardCodeTableEntry* entry_end,
+    const CanardRxTransfer* transfer,
+    uint32_t* bit_ofs,
+    void* msg,
+    bool tao)
+{
+    do {
+        void* p = (void*)((char*)msg + entry->offset);
+        uint8_t type = entry->type_extra & ((1<<CANARD_TABLE_CODING_TYPE_BITS)-1);
+        uint8_t bitlen = entry->bitlen;
+
+        switch (type) {
+        case CANARD_TABLE_CODING_UNSIGNED:
+        case CANARD_TABLE_CODING_SIGNED:
+        case CANARD_TABLE_CODING_FLOAT: {
+            canardDecodeScalar(transfer, *bit_ofs, bitlen, type != CANARD_TABLE_CODING_UNSIGNED, p);
+            if (type == CANARD_TABLE_CODING_FLOAT && bitlen == 16) {
+                uint16_t float16_val = *(uint16_t*)p;
+                *(float*)p = canardConvertFloat16ToNativeFloat(float16_val);
+            }
+        }
+        // fallthrough
+        case CANARD_TABLE_CODING_VOID:
+            // nothing to decode for void
+            *bit_ofs += bitlen;
+            break;
+
+        case CANARD_TABLE_CODING_ARRAY_STATIC: {
+            const CanardCodeTableEntry* aux = ++entry;
+            const CanardCodeTableEntry* array_entry = ++entry;
+            const CanardCodeTableEntry* array_entry_end = array_entry + bitlen;
+
+            int len = aux->bitlen+1;
+            for (int i=0; i<len; i++) {
+                if (_canardTableDecode_core(array_entry, array_entry_end, transfer, bit_ofs, p, tao)) {
+                    return true;
+                }
+                p = (void*)((char*)p + aux->offset);
+            }
+            entry = array_entry_end-1;
+
+            break;
+        }
+
+        case CANARD_TABLE_CODING_ARRAY_DYNAMIC:
+        case CANARD_TABLE_CODING_ARRAY_DYNAMIC_TAO: {
+            const CanardCodeTableEntry* aux = ++entry;
+            const CanardCodeTableEntry* aux2 = ++entry;
+            const CanardCodeTableEntry* array_entry = ++entry;
+            const CanardCodeTableEntry* array_entry_end = array_entry + bitlen;
+
+            uint16_t max_len = (aux->bitlen | ((uint16_t)aux2->bitlen << 8))+1;
+            uint8_t len_bitlen = aux2->type_extra;
+            void* len_p = (void*)((char*)msg + aux2->offset);
+            if (type != CANARD_TABLE_CODING_ARRAY_DYNAMIC_TAO || !tao) {
+                // not using TAO
+                canardDecodeScalar(transfer, *bit_ofs, len_bitlen, false, len_p);
+                *bit_ofs += len_bitlen;
+
+                uint16_t len;
+                if (len_bitlen <= 8) {
+                    len = *(uint8_t*)len_p;
+                } else { // 16 bits is max supported len
+                    len = *(uint16_t*)len_p;
+                }
+                if (len > max_len) {
+                    return true; // invalid value
+                }
+
+                for (uint16_t i=0; i<len; i++) {
+                    if (_canardTableDecode_core(array_entry, array_entry_end, transfer, bit_ofs, p, false)) {
+                        return true;
+                    }
+                    p = (void*)((char*)p + aux->offset);
+                }
+            } else {
+                // TAO optimization in play
+                uint16_t len = 0;
+                while ((transfer->payload_len*8) > *bit_ofs) {
+                    if (_canardTableDecode_core(array_entry, array_entry_end, transfer, bit_ofs, p, false)) {
+                        return true;
+                    }
+                    p = (void*)((char*)p + aux->offset);
+                    len++;
+                }
+                if (len_bitlen <= 8) {
+                    *(uint8_t*)len_p = (uint8_t)len;
+                } else { // 16 bits is max supported len
+                    *(uint16_t*)len_p = len;
+                }
+            }
+            
+            entry = array_entry_end-1;
+
+            break;
+        }
+
+        default:
+            return true; // invalid entry
+        }
+    } while (++entry < entry_end);
+
+    return false; // success
+}
+
+bool canardTableDecode(const CanardCodeTable* table,
+    const CanardRxTransfer* transfer,
+    void* msg)
+{
+#if CANARD_ENABLE_TAO_OPTION
+    if (transfer->tao && (transfer->payload_len > table->max_size)) {
+        return true; // invalid length
+    }
+#endif
+
+    uint32_t bit_ofs = 0;
+    const CanardCodeTableEntry* entry = &table->entries[0];
+    const CanardCodeTableEntry* entry_end = &table->entries[table->num_entries];
+    if (_canardTableDecode_core(entry, entry_end, transfer, &bit_ofs, msg,
+#if CANARD_ENABLE_TAO_OPTION
+    transfer->tao
+#else
+    true
+#endif
+    )) {
+        return true; // decode failure
+    }
+
+    const uint32_t byte_len = (bit_ofs+7U)/8U;
+#if CANARD_ENABLE_TAO_OPTION
+    // if this could be CANFD then the dlc could indicating more bytes than
+    // we actually have
+    if (!transfer->tao) {
+        return byte_len > transfer->payload_len;
+    }
+#endif
+    return byte_len != transfer->payload_len;
+}
+
 static void _canardTableEncode_core(const CanardCodeTableEntry* entry,
     const CanardCodeTableEntry* entry_end,
     uint8_t* buffer,
