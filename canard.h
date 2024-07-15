@@ -689,27 +689,29 @@ void canardEncodeScalar(void* destination,      ///< Destination buffer where th
 #if CANARD_ENABLE_TABLE_CODING
 
 typedef struct {
-    // low 6 bits: size in bits - 1
-    // high 2 bits: data type
+    uint16_t offset; // offset in output struct
+    // high 5 bits: extra data
+    // low 3 bits: data type
     //   0: unsigned
-    //   1: signed (if size is 1 bit, then really float16)
-    //   2: void
-    //   3: complex (TBD)
-    uint8_t type_size;
-    uint8_t offset; // offset in output struct
+    //   1: signed
+    //   2: float
+    //   3: void
+    //   4-7: complex (TBD)
+    uint8_t type_extra;
+    uint8_t bitlen; // length in bits of type
 } CanardCodeTableEntry;
 
-#define CANARD_TABLE_CODING_UNSIGNED (0 << 6)
-#define CANARD_TABLE_CODING_SIGNED (1 << 6)
-#define CANARD_TABLE_CODING_VOID (2 << 6)
-#define CANARD_TABLE_CODING_COMPLEX (3 << 6)
-#define CANARD_TABLE_CODING_TYPE_MASK (3 << 6)
-#define CANARD_TABLE_CODING_SIZE_MASK (63)
-
+#define CANARD_TABLE_CODING_UNSIGNED (0)
+#define CANARD_TABLE_CODING_SIGNED (1)
+#define CANARD_TABLE_CODING_FLOAT (2)
+#define CANARD_TABLE_CODING_VOID (3)
+#define CANARD_TABLE_CODING_TYPE_BITS (3)
+#define CANARD_TABLE_CODING_EXTRA_BITS (5)
 
 typedef struct {
-    uint32_t max_size;
-    CanardCodeTableEntry entry[];
+    uint32_t max_size; // must be > 0
+    uint16_t num_entries; // must be > 0
+    CanardCodeTableEntry entries[];
 } CanardCodeTable;
 
 bool canardTableDecode(const CanardCodeTable* table,

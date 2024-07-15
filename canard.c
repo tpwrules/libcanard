@@ -1002,27 +1002,35 @@ uint32_t canardTableEncode(const CanardCodeTable* table,
     memset(buffer, 0, table->max_size);
 
     uint32_t bit_ofs = 0;
-    const CanardCodeTableEntry* entry = &table->entry[0];
-    while (entry->offset < 255) {
-        uint8_t type = entry->type_size & CANARD_TABLE_CODING_TYPE_MASK;
-        uint8_t size = (entry->type_size & CANARD_TABLE_CODING_SIZE_MASK) + 1;
+    const CanardCodeTableEntry* entry = &table->entries[0];
+    const CanardCodeTableEntry* entry_end = &table->entries[table->num_entries];
+    do {
         void* p = (void*)((char*)msg + entry->offset);
+        uint8_t type = entry->type_extra & ((1<<CANARD_TABLE_CODING_TYPE_BITS)-1);
+        uint8_t bitlen = entry->bitlen;
 
-        if (type == CANARD_TABLE_CODING_UNSIGNED || type == CANARD_TABLE_CODING_SIGNED) {
-            if (type == CANARD_TABLE_CODING_SIGNED && size == 1) { // special case as there's no signed 1 bit type
-                uint16_t float16_val = canardConvertNativeFloatToFloat16(*(float*)p);
-                canardEncodeScalar(buffer, bit_ofs, 16, &float16_val);
-            } else {
-                canardEncodeScalar(buffer, bit_ofs, size, p);
+        switch (type) {
+        case CANARD_TABLE_CODING_UNSIGNED:
+        case CANARD_TABLE_CODING_SIGNED:
+        case CANARD_TABLE_CODING_FLOAT: {
+            uint16_t float16_val;
+            if (type == CANARD_TABLE_CODING_FLOAT && bitlen == 16) {
+                float16_val = canardConvertNativeFloatToFloat16(*(float*)p);
+                p = (void*)&float16_val;
             }
-            bit_ofs += size;
-        } else {
-            // void encoding is taken care of by memset
-            bit_ofs += size;
+            canardEncodeScalar(buffer, bit_ofs, bitlen, p);
         }
+        // fallthrough
+        case CANARD_TABLE_CODING_VOID:
+            // void encoding is taken care of by memset
+            bit_ofs += bitlen;
+            break;
 
-        entry++;
-    }
+        default:
+            return 0; // invalid entry
+        }
+    } while (++entry < entry_end);
+
     return ((bit_ofs+7)/8);
 }
 
