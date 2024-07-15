@@ -1075,7 +1075,9 @@ static bool _canardTableDecode_core(const CanardCodeTableEntry* entry,
             } else {
                 // TAO optimization in play
                 uint16_t len = 0;
-                while ((transfer->payload_len*8) > *bit_ofs) {
+                // TAO requires the element size to be at least 8 bits so if we have less we know we are done
+                uint32_t max_bits = (transfer->payload_len*8)-7;
+                while (max_bits > *bit_ofs) {
                     if (_canardTableDecode_core(array_entry, array_entry_end, transfer, bit_ofs, p, false)) {
                         return true;
                     }
