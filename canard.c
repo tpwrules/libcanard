@@ -994,6 +994,8 @@ void canardEncodeScalar(void* destination,
     copyBitArray(&storage.bytes[0], 0, bit_length, (uint8_t*) destination, bit_offset);
 }
 
+#if CANARD_ENABLE_TABLE_CODING
+
 static void _canardTableEncode_core(const CanardCodeTableEntry* entry,
     const CanardCodeTableEntry* entry_end,
     uint8_t* buffer,
@@ -1065,7 +1067,7 @@ static void _canardTableEncode_core(const CanardCodeTableEntry* entry,
             }
 
             for (uint16_t i=0; i<len; i++) {
-                _canardTableEncode_core(array_entry, array_entry_end, buffer, bit_ofs, p, tao);
+                _canardTableEncode_core(array_entry, array_entry_end, buffer, bit_ofs, p, tao && i==len-1);
                 p = (void*)((char*)p + aux->offset);
             }
             entry = array_entry_end-1;
@@ -1093,6 +1095,8 @@ uint32_t canardTableEncode(const CanardCodeTable* table,
 
     return ((bit_ofs+7)/8);
 }
+
+#endif
 
 void canardReleaseRxTransferPayload(CanardInstance* ins, CanardRxTransfer* transfer)
 {
