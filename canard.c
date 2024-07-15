@@ -994,16 +994,13 @@ void canardEncodeScalar(void* destination,
     copyBitArray(&storage.bytes[0], 0, bit_length, (uint8_t*) destination, bit_offset);
 }
 
-uint32_t canardTableEncode(const CanardCodeTable* table,
+static void _canardTableEncode_core(const CanardCodeTableEntry* entry,
+    const CanardCodeTableEntry* entry_end,
     uint8_t* buffer,
+    uint32_t* bit_ofs,
     void* msg,
     bool tao)
 {
-    memset(buffer, 0, table->max_size);
-
-    uint32_t bit_ofs = 0;
-    const CanardCodeTableEntry* entry = &table->entries[0];
-    const CanardCodeTableEntry* entry_end = &table->entries[table->num_entries];
     do {
         void* p = (void*)((char*)msg + entry->offset);
         uint8_t type = entry->type_extra & ((1<<CANARD_TABLE_CODING_TYPE_BITS)-1);
@@ -1018,18 +1015,42 @@ uint32_t canardTableEncode(const CanardCodeTable* table,
                 float16_val = canardConvertNativeFloatToFloat16(*(float*)p);
                 p = (void*)&float16_val;
             }
-            canardEncodeScalar(buffer, bit_ofs, bitlen, p);
+            canardEncodeScalar(buffer, *bit_ofs, bitlen, p);
         }
         // fallthrough
         case CANARD_TABLE_CODING_VOID:
             // void encoding is taken care of by memset
-            bit_ofs += bitlen;
+            *bit_ofs += bitlen;
             break;
 
+        case CANARD_TABLE_CODING_ARRAY_STATIC: {
+            const CanardCodeTableEntry* aux = ++entry;
+            const CanardCodeTableEntry* array_entry = ++entry;
+            const CanardCodeTableEntry* array_entry_end = array_entry + bitlen;
+            for (int i=0; i<aux->bitlen+1; i++) {
+                _canardTableEncode_core(array_entry, array_entry_end, buffer, bit_ofs, p, tao);
+                p = (void*)((char*)p + aux->offset);
+            }
+            entry = array_entry_end-1;
+        }
+
         default:
-            return 0; // invalid entry
+            return; // invalid entry
         }
     } while (++entry < entry_end);
+}
+
+uint32_t canardTableEncode(const CanardCodeTable* table,
+    uint8_t* buffer,
+    void* msg,
+    bool tao)
+{
+    memset(buffer, 0, table->max_size);
+
+    uint32_t bit_ofs = 0;
+    const CanardCodeTableEntry* entry = &table->entries[0];
+    const CanardCodeTableEntry* entry_end = &table->entries[table->num_entries];
+    _canardTableEncode_core(entry, entry_end, buffer, &bit_ofs, msg, tao);
 
     return ((bit_ofs+7)/8);
 }

@@ -696,7 +696,14 @@ typedef struct {
     //   1: signed
     //   2: float
     //   3: void
-    //   4-7: complex (TBD)
+
+    //   4: statically sized array
+    //      offset: offset to first element of array
+    //      bitlen: number of entries containing array contents
+    //      aux offset: sizeof entry
+    //      aux bitlen: length - 1
+
+    //   5-7: reserved
     uint8_t type_extra;
     uint8_t bitlen; // length in bits of type
 } CanardCodeTableEntry;
@@ -705,6 +712,7 @@ typedef struct {
 #define CANARD_TABLE_CODING_SIGNED (1)
 #define CANARD_TABLE_CODING_FLOAT (2)
 #define CANARD_TABLE_CODING_VOID (3)
+#define CANARD_TABLE_CODING_ARRAY_STATIC (4)
 #define CANARD_TABLE_CODING_TYPE_BITS (3)
 #define CANARD_TABLE_CODING_EXTRA_BITS (5)
 
