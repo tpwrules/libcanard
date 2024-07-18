@@ -729,7 +729,7 @@ typedef struct {
 #define CANARD_TABLE_CODING_EXTRA_BITS (5)
 
 typedef struct {
-    uint32_t max_size; // must be > 0
+    uint16_t max_size; // must be > 0
     uint16_t num_entries; // must be > 0
     CanardCodeTableEntry entries[];
 } CanardCodeTable;
