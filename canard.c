@@ -1031,7 +1031,7 @@ static bool _canardTableDecode_core(const CanardCodeTableEntry* entry,
 
             int len = aux->bitlen+1;
             for (int i=0; i<len; i++) {
-                if (_canardTableDecode_core(array_entry, array_entry_end, transfer, bit_ofs, p, tao)) {
+                if (_canardTableDecode_core(array_entry, array_entry_end, transfer, bit_ofs, p, tao && i == len-1)) {
                     return true;
                 }
                 p = (void*)((char*)p + aux->offset);
@@ -1067,7 +1067,7 @@ static bool _canardTableDecode_core(const CanardCodeTableEntry* entry,
                 }
 
                 for (uint16_t i=0; i<len; i++) {
-                    if (_canardTableDecode_core(array_entry, array_entry_end, transfer, bit_ofs, p, false)) {
+                    if (_canardTableDecode_core(array_entry, array_entry_end, transfer, bit_ofs, p, tao && i==len-1)) {
                         return true;
                     }
                     p = (void*)((char*)p + aux->offset);
@@ -1174,7 +1174,7 @@ static void _canardTableEncode_core(const CanardCodeTableEntry* entry,
 
             int len = aux->bitlen+1;
             for (int i=0; i<len; i++) {
-                _canardTableEncode_core(array_entry, array_entry_end, buffer, bit_ofs, p, tao);
+                _canardTableEncode_core(array_entry, array_entry_end, buffer, bit_ofs, p, tao && i==len-1);
                 p = (void*)((char*)p + aux->offset);
             }
             entry = array_entry_end-1;
@@ -1208,8 +1208,9 @@ static void _canardTableEncode_core(const CanardCodeTableEntry* entry,
                 len = max_len;
             }
 
+            int element_tao = type != CANARD_TABLE_CODING_ARRAY_DYNAMIC_TAO && tao;
             for (uint16_t i=0; i<len; i++) {
-                _canardTableEncode_core(array_entry, array_entry_end, buffer, bit_ofs, p, tao && i==len-1);
+                _canardTableEncode_core(array_entry, array_entry_end, buffer, bit_ofs, p, element_tao && i==len-1);
                 p = (void*)((char*)p + aux->offset);
             }
             entry = array_entry_end-1;
